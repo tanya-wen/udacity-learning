@@ -1,0 +1,73 @@
+/* QUERY 1: query that lists each movie, the film category, and number of times rented out */
+SELECT DISTINCT(category_name), 
+       COUNT(rental_id) OVER (PARTITION BY category_name) as rental_count
+FROM
+       (SELECT film.title as film_title, 
+              category.name as category_name, 
+              rental.rental_id as rental_id
+       FROM film
+       JOIN film_category
+       ON film.film_id = film_category.film_id
+       JOIN category
+       ON film_category.category_id = category.category_id 
+       JOIN inventory
+       ON film.film_id = inventory.film_id
+       JOIN rental
+       ON inventory.inventory_id = rental.inventory_id) t1
+WHERE category_name = 'Animation' OR category_name = 'Children' OR category_name = 'Classics' OR category_name ='Comedy' OR category_name = 'Family' OR category_name = 'Music'
+
+
+
+
+/* QUERY 2: family-friendly film category, each of the quartiles, and the corresponding count of movies within each combination of film category for each corresponding rental duration category  */
+SELECT DISTINCT(category_name), 
+standard_quartile,
+COUNT(standard_quartile) OVER (PARTITION BY category_name, standard_quartile) as count
+FROM
+(SELECT film.title as film_title, 
+category.name as category_name,
+film.rental_duration as rental_duration,
+NTILE(4) OVER (ORDER BY film.rental_duration) as standard_quartile
+FROM film_category
+JOIN film
+ON film.film_id = film_category.film_id
+JOIN category
+ON film_category.category_id = category.category_id 
+WHERE category.name = 'Animation' OR category.name = 'Children' OR category.name = 'Classics' OR category.name ='Comedy' OR category.name = 'Family' OR category.name = 'Music') t1
+ORDER BY 1,2
+
+
+
+/* QUERY 3: query that returns store ID for the store, the year and month and the number of rental orders each store has fulfilled for that month  */
+SELECT  EXTRACT(MONTH FROM rental.rental_date) as rental_month, 
+	EXTRACT(YEAR FROM rental.rental_date) as rental_year, 
+        inventory.store_id as store_id, 
+        COUNT(rental.rental_id) as count_rentals
+ FROM film
+ JOIN film_category
+ ON film.film_id = film_category.film_id
+ JOIN category
+ ON film_category.category_id = category.category_id 
+ JOIN inventory
+ ON film.film_id = inventory.film_id
+ JOIN rental
+ ON inventory.inventory_id = rental.inventory_id
+GROUP BY 1,2,3
+ORDER BY count_rentals DESC
+
+
+
+
+/* QUERY 4: query to capture the customer name, month and year of payment, and total payment amount for each month by top 10 paying customers */
+SELECT CONCAT(customer.first_name, ' ', customer.last_name) AS fullname, 
+DATE_TRUNC('month',payment.payment_date) AS pay_mon,
+SUM(payment.amount) AS pay_amount,
+COUNT(payment.amount) AS pay_countpermonth
+FROM customer
+JOIN rental
+ON customer.customer_id = rental.customer_id
+JOIN payment
+ON customer.customer_id = payment.customer_id
+GROUP BY fullname, pay_mon
+ORDER BY pay_amount DESC
+LIMIT 10
